@@ -1,5 +1,6 @@
 import { MetricCard } from "./MetricCard";
 import { PickingTable } from "./PickingTable";
+import { PickerPerformanceCard, PickerStats } from "./PickerPerformanceCard";
 import { samplePickingData } from "@/data/pickingData";
 import { Package, Truck, Users, TrendingUp, Clock, CheckCircle } from "lucide-react";
 
@@ -38,8 +39,73 @@ function calculateMetrics() {
   };
 }
 
+function calculatePickerStats(): PickerStats[] {
+  const pickerMap = new Map<string, any[]>();
+  
+  // Group data by picker
+  samplePickingData.forEach(item => {
+    if (item.picker) {
+      if (!pickerMap.has(item.picker)) {
+        pickerMap.set(item.picker, []);
+      }
+      pickerMap.get(item.picker)!.push(item);
+    }
+  });
+  
+  const pickerStats: PickerStats[] = [];
+  
+  pickerMap.forEach((tasks, pickerName) => {
+    const completedTasks = tasks.filter(task => 
+      task.pickingStatus && task.pickingStatus.includes("100%")
+    ).length;
+    
+    const totalTasks = tasks.length;
+    const activeTasks = totalTasks - completedTasks;
+    const totalItems = tasks.reduce((sum, task) => sum + task.qty, 0);
+    const totalWeight = tasks.reduce((sum, task) => sum + task.weight, 0);
+    
+    // Calculate average progress
+    const progressValues = tasks.map(task => {
+      if (!task.pickingStatus) return 0;
+      const match = task.pickingStatus.match(/(\d+)%/);
+      return match ? parseInt(match[1]) : 0;
+    });
+    const averageProgress = progressValues.length > 0 
+      ? Math.round(progressValues.reduce((sum, val) => sum + val, 0) / progressValues.length)
+      : 0;
+    
+    const completionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+    
+    // Determine performance status
+    let performanceStatus: "excellent" | "good" | "needs-attention";
+    if (completionRate >= 80) {
+      performanceStatus = "excellent";
+    } else if (completionRate >= 50) {
+      performanceStatus = "good";
+    } else {
+      performanceStatus = "needs-attention";
+    }
+    
+    pickerStats.push({
+      name: pickerName,
+      completionRate,
+      totalTasks,
+      completedTasks,
+      activeTasks,
+      totalItems,
+      totalWeight,
+      averageProgress,
+      performanceStatus
+    });
+  });
+  
+  // Sort by completion rate (descending)
+  return pickerStats.sort((a, b) => b.completionRate - a.completionRate);
+}
+
 export function Dashboard() {
   const metrics = calculateMetrics();
+  const pickerStats = calculatePickerStats();
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30 p-6">
@@ -117,6 +183,26 @@ export function Dashboard() {
             variant="warning"
           />
         </div>
+
+        {/* Picker Performance Section */}
+        {pickerStats.length > 0 && (
+          <div className="space-y-6">
+            <div className="text-center space-y-2">
+              <h2 className="text-2xl font-bold text-foreground">Picker Performance</h2>
+              <p className="text-muted-foreground">Individual picker statistics and performance metrics</p>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+              {pickerStats.map((picker, index) => (
+                <PickerPerformanceCard
+                  key={picker.name}
+                  picker={picker}
+                  rank={index + 1}
+                />
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Main Table */}
         <PickingTable data={samplePickingData} />
