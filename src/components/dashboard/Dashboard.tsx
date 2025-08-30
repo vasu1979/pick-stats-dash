@@ -1,8 +1,9 @@
 import { MetricCard } from "./MetricCard";
 import { PickingTable } from "./PickingTable";
 import { PickerPerformanceCard, PickerStats } from "./PickerPerformanceCard";
+import { CompactMetricCard } from "./CompactMetricCard";
 import { samplePickingData } from "@/data/pickingData";
-import { Package, Truck, Users, TrendingUp, Clock, CheckCircle } from "lucide-react";
+import { Package, Truck, Users, TrendingUp, Clock, CheckCircle, Scale } from "lucide-react";
 
 function calculateMetrics() {
   const totalShipments = samplePickingData.length;
@@ -21,10 +22,23 @@ function calculateMetrics() {
   const activePickers = new Set(
     samplePickingData.filter(item => item.picker).map(item => item.picker)
   ).size;
+  
+  // Daily picking metrics
   const totalWeight = samplePickingData.reduce((sum, item) => sum + item.weight, 0);
   const totalQuantity = samplePickingData.reduce((sum, item) => sum + item.qty, 0);
   
+  const completedItems = samplePickingData.filter(item => 
+    item.pickingStatus && item.pickingStatus.includes("100%")
+  );
+  const pickedWeight = completedItems.reduce((sum, item) => sum + item.weight, 0);
+  const pickedQuantity = completedItems.reduce((sum, item) => sum + item.qty, 0);
+  
+  const remainingWeight = totalWeight - pickedWeight;
+  const remainingQuantity = totalQuantity - pickedQuantity;
+  
   const completionRate = totalShipments > 0 ? Math.round((completedPickings / totalShipments) * 100) : 0;
+  const weightCompletionRate = totalWeight > 0 ? Math.round((pickedWeight / totalWeight) * 100) : 0;
+  const quantityCompletionRate = totalQuantity > 0 ? Math.round((pickedQuantity / totalQuantity) * 100) : 0;
   
   return {
     totalShipments,
@@ -35,7 +49,13 @@ function calculateMetrics() {
     activePickers,
     totalWeight: Math.round(totalWeight * 100) / 100,
     totalQuantity,
-    completionRate
+    pickedWeight: Math.round(pickedWeight * 100) / 100,
+    pickedQuantity,
+    remainingWeight: Math.round(remainingWeight * 100) / 100,
+    remainingQuantity,
+    completionRate,
+    weightCompletionRate,
+    quantityCompletionRate
   };
 }
 
@@ -120,67 +140,68 @@ export function Dashboard() {
           </p>
         </div>
 
-        {/* Metrics Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <MetricCard
-            title="Total Shipments"
-            value={metrics.totalShipments}
-            subtitle="Active shipments"
-            icon={<Package className="h-5 w-5" />}
-            variant="primary"
-            trend={{ value: 12, isPositive: true }}
-          />
+        {/* Daily Picking Progress */}
+        <div className="space-y-4">
+          <div className="text-center space-y-2">
+            <h2 className="text-xl font-bold text-foreground">Today's Picking Progress</h2>
+            <p className="text-muted-foreground text-sm">Real-time tracking of daily picking targets</p>
+          </div>
           
-          <MetricCard
-            title="Completion Rate"
-            value={`${metrics.completionRate}%`}
-            subtitle="Picking completed"
-            icon={<CheckCircle className="h-5 w-5" />}
-            variant="success"
-            trend={{ value: 8, isPositive: true }}
-          />
-          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <CompactMetricCard
+              title="Quantity Progress"
+              total={metrics.totalQuantity.toLocaleString()}
+              picked={metrics.pickedQuantity.toLocaleString()}
+              remaining={metrics.remainingQuantity.toLocaleString()}
+              completionRate={metrics.quantityCompletionRate}
+              icon={<Package className="h-4 w-4" />}
+              variant="primary"
+            />
+            
+            <CompactMetricCard
+              title="Weight Progress"
+              total={`${metrics.totalWeight.toLocaleString()} kg`}
+              picked={`${metrics.pickedWeight.toLocaleString()} kg`}
+              remaining={`${metrics.remainingWeight.toLocaleString()} kg`}
+              completionRate={metrics.weightCompletionRate}
+              icon={<Scale className="h-4 w-4" />}
+              variant="success"
+            />
+          </div>
+        </div>
+
+        {/* Key Metrics */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <MetricCard
             title="Active Pickers"
             value={metrics.activePickers}
             subtitle="Currently working"
-            icon={<Users className="h-5 w-5" />}
+            icon={<Users className="h-4 w-4" />}
             variant="default"
           />
           
           <MetricCard
-            title="Vehicles Arrived"
-            value={metrics.arrivedVehicles}
-            subtitle={`${metrics.onTheWayVehicles} on the way`}
-            icon={<Truck className="h-5 w-5" />}
-            variant="warning"
-          />
-        </div>
-
-        {/* Additional Metrics Row */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <MetricCard
-            title="Total Weight"
-            value={`${metrics.totalWeight.toLocaleString()} kg`}
-            subtitle="Across all shipments"
-            icon={<TrendingUp className="h-5 w-5" />}
-            variant="default"
-          />
-          
-          <MetricCard
-            title="Total Quantity"
-            value={metrics.totalQuantity.toLocaleString()}
-            subtitle="Items to pick"
-            icon={<Package className="h-5 w-5" />}
-            variant="primary"
+            title="Shipments"
+            value={`${metrics.completedPickings}/${metrics.totalShipments}`}
+            subtitle="Completed/Total"
+            icon={<CheckCircle className="h-4 w-4" />}
+            variant="success"
           />
           
           <MetricCard
             title="In Progress"
             value={metrics.inProgressPickings}
-            subtitle="Currently being picked"
-            icon={<Clock className="h-5 w-5" />}
+            subtitle="Currently picking"
+            icon={<Clock className="h-4 w-4" />}
             variant="warning"
+          />
+          
+          <MetricCard
+            title="Vehicles"
+            value={`${metrics.arrivedVehicles}/${metrics.arrivedVehicles + metrics.onTheWayVehicles}`}
+            subtitle="Arrived/Expected"
+            icon={<Truck className="h-4 w-4" />}
+            variant="primary"
           />
         </div>
 
